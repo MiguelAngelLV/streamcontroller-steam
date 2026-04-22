@@ -1,6 +1,6 @@
 {
-    "version": "",
-    "thumbnail": "",
-    "id": "",
-    "name": ""
+    "version": "1.0.2",
+    "thumbnail": "assets/info.png",
+    "id": "steam",
+    "name": "Steam Games"
 }
