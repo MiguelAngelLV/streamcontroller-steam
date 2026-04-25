@@ -215,18 +215,35 @@ class SteamLibrary:
             return False
 
     def is_big_picture_active(self) -> bool:
-        """Checks if Big Picture mode is active"""
+        """Checks if Big Picture mode is currently active by inspecting live window state."""
+
+        # Method 1: wmctrl — list all windows and look for a Steam Big Picture window
         try:
-            result = subprocess.run(['pgrep', '-f', 'steam://open/bigpicture'],
-                                  capture_output=True,
-                                  text=True)
-
-            return result.returncode == 0
+            result = subprocess.run(
+                ['wmctrl', '-l'],
+                capture_output=True, text=True, timeout=2
+            )
+            if result.returncode == 0:
+                return 'big picture' in result.stdout.lower()
+        except FileNotFoundError:
+            pass  # wmctrl not installed, try next method
         except Exception as e:
-            if "wmctrl" not in str(e):
-                print(f"Error checking Big Picture: {e}")
-            return False
+            print(f"[is_big_picture_active] wmctrl failed: {e}")
 
+        # Method 2: xdotool — query window names by Steam's X11 class
+        try:
+            result = subprocess.run(
+                ['xdotool', 'search', '--class', 'steam', 'getwindowname', '%@'],
+                capture_output=True, text=True, timeout=2
+            )
+            if result.returncode == 0:
+                return 'big picture' in result.stdout.lower()
+        except FileNotFoundError:
+            pass  # xdotool not installed
+        except Exception as e:
+            print(f"[is_big_picture_active] xdotool failed: {e}")
+
+        return False
 
     def open_big_picture(self) -> bool:
         """Opens Steam Big Picture mode"""
@@ -261,6 +278,123 @@ class SteamLibrary:
             return True
         except Exception as e:
             print(f"Error closing Steam: {e}")
+            return False
+
+    def get_current_status(self) -> Optional[str]:
+        """Reads the current Steam friend status.
+        Returns 'online', 'away', 'invisible', 'offline', or None if undetectable.
+
+        Detection order:
+        1. loginusers.vdf → WantsOfflineMode=1  →  'offline'
+           (ePersonaState is NOT updated when going offline, so this check comes first)
+        2. localconfig.vdf → FriendStoreLocalPrefs → ePersonaState
+           (1=online, 3=away, 7=invisible)
+        """
+        try:
+            if not self.steam_path:
+                return None
+
+            # --- Step 1: Check WantsOfflineMode in loginusers.vdf ---
+            loginusers_path = self.steam_path / "config" / "loginusers.vdf"
+            if loginusers_path.exists():
+                with open(loginusers_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    lu_content = f.read()
+                offline_match = re.search(r'"WantsOfflineMode"\s+"(\d+)"', lu_content)
+                if offline_match and offline_match.group(1) == '1':
+                    return 'offline'
+
+            # --- Step 2: Read ePersonaState from localconfig.vdf ---
+            # ePersonaState map (offline excluded — handled above)
+            state_map = {1: 'online', 3: 'away', 7: 'invisible'}
+
+            userdata_path = self.steam_path / "userdata"
+            if not userdata_path.exists():
+                return None
+
+            user_dirs = [d for d in userdata_path.iterdir() if d.is_dir() and d.name.isdigit()]
+            if not user_dirs:
+                return None
+
+            import json
+            for user_dir in user_dirs:
+                localconfig = user_dir / "config" / "localconfig.vdf"
+                if not localconfig.exists():
+                    continue
+
+                with open(localconfig, 'r', encoding='utf-8', errors='ignore') as f:
+                    content = f.read()
+
+                # FriendStoreLocalPrefs_<steamid> contains JSON with ePersonaState.
+                # The value is a quoted string with \" escapes inside.
+                match = re.search(
+                    r'"FriendStoreLocalPrefs_\d+"\s+"((?:[^"\\]|\\.)*)"', content
+                )
+                if match:
+                    try:
+                        json_str = match.group(1).replace('\\"', '"')
+                        data = json.loads(json_str)
+                        state_int = data.get('ePersonaState')
+                        if state_int is not None:
+                            return state_map.get(int(state_int))
+                    except (json.JSONDecodeError, ValueError):
+                        pass
+        except Exception as e:
+            print(f"[get_current_status] Error: {e}")
+
+        return None
+
+    def change_status(self, status: str) -> bool:
+        """Changes Steam friend status. status: 'online', 'away', 'invisible', 'offline'"""
+        status_map = {
+            'online':    'steam://friends/status/online',
+            'away':      'steam://friends/status/away',
+            'invisible': 'steam://friends/status/invisible',
+            'offline':   'steam://friends/status/offline',
+        }
+        url = status_map.get(status)
+        if not url:
+            print(f"[change_status] Unknown status: {status}")
+            return False
+        try:
+            subprocess.Popen(['xdg-open', url],
+                             stdout=subprocess.DEVNULL,
+                             stderr=subprocess.DEVNULL)
+            return True
+        except Exception as e:
+            print(f"Error changing status to {status}: {e}")
+            return False
+
+    def open_steam_page(self, page: str) -> bool:
+        """Opens a Steam page. page: 'store', 'friends', 'downloads', 'news', 'screenshots'"""
+        page_map = {
+            'store':       'steam://open/store',
+            'friends':     'steam://open/friends',
+            'downloads':   'steam://open/downloads',
+            'news':        'steam://open/news',
+            'screenshots': 'steam://open/screenshots',
+        }
+        url = page_map.get(page)
+        if not url:
+            print(f"[open_steam_page] Unknown page: {page}")
+            return False
+        try:
+            subprocess.Popen(['xdg-open', url],
+                             stdout=subprocess.DEVNULL,
+                             stderr=subprocess.DEVNULL)
+            return True
+        except Exception as e:
+            print(f"Error opening Steam page {page}: {e}")
+            return False
+
+    def take_screenshot(self) -> bool:
+        """Triggers a Steam screenshot"""
+        try:
+            subprocess.Popen(['xdg-open', 'steam://screenshot'],
+                             stdout=subprocess.DEVNULL,
+                             stderr=subprocess.DEVNULL)
+            return True
+        except Exception as e:
+            print(f"Error taking screenshot: {e}")
             return False
 
 

@@ -29,7 +29,7 @@ class LaunchGame(ActionBase):
             if icon_path and icon_path.exists():
                 self.set_media(media_path=str(icon_path), size=1.0)
             else:
-                default_icon = os.path.join(self.plugin_base.PATH, "assets", "info.png")
+                default_icon = os.path.join(self.plugin_base.PATH, "assets", "steam.png")
                 self.set_media(media_path=default_icon, size=0.75)
 
             game_name = settings.get("game_name", "")
@@ -40,7 +40,7 @@ class LaunchGame(ActionBase):
                     label = game_name
                 self.set_bottom_label(label, font_size=12)
         else:
-            default_icon = os.path.join(self.plugin_base.PATH, "assets", "info.png")
+            default_icon = os.path.join(self.plugin_base.PATH, "assets", "steam.png")
             self.set_media(media_path=default_icon, size=0.75)
             self.set_bottom_label("No Game", font_size=12)
 
