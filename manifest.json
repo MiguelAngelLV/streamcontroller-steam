@@ -1,6 +1,18 @@
 {
-    "version": "1.0.2",
-    "thumbnail": "assets/info.png",
-    "id": "steam",
-    "name": "Steam Games"
+    "version": "0.8",
+    "thumbnail": "assets/steam.png",
+    "id": "miguel.angel.lopez.viente@gmail.com",
+    "name": "Steam",
+    "app-version": "1.5.0-beta.14",
+    "author": "MiguelAngelLV",
+    "github": "https://github.com/miguelangellv/streamcontroller-steam",
+    "descriptions": {
+        "en_US": "Control Steam directly from your Stream Deck. Launch games, toggle Big Picture mode, change your online status, open Steam pages (store, friends, downloads, news, screenshots), take screenshots, and close Steam — all with a single button press.",
+        "es_ES": "Controla Steam directamente desde tu Stream Deck. Lanza juegos, activa el modo Big Picture, cambia tu estado en línea, abre secciones de Steam (tienda, amigos, descargas, noticias, capturas), toma capturas de pantalla y cierra Steam — todo con un solo botón."
+    },
+    "short-descriptions": {
+        "en_US": "Control Steam from your Stream Deck: launch games, toggle Big Picture, change status, and more.",
+        "es_ES": "Controla Steam desde tu Stream Deck: lanza juegos, activa Big Picture, cambia el estado y mucho más."
+    },
+    "tags": ["steam", "gaming", "big picture", "launcher"]
 }
