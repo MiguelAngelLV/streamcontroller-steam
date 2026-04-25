@@ -44,6 +44,11 @@ class ChangeStatus(ActionBase):
         self._last_status = None  # last known Steam status key
 
     def on_ready(self) -> None:
+        # Cancel any pending debounce timer left over from before a page navigation
+        if self._pending_timeout_id is not None:
+            GLib.source_remove(self._pending_timeout_id)
+            self._pending_timeout_id = None
+
         settings = self.get_settings()
         committed = settings.get("committed_status", "online")
         self._displayed_idx = STATUS_KEYS.index(committed) if committed in STATUS_KEYS else 0
