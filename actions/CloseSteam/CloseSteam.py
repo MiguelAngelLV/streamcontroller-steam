@@ -10,7 +10,7 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Gtk, Adw, GLib
 
-from ...steam_utils import get_steam_library
+from ...steam_utils import get_steam_library, _run_check
 
 
 class CloseSteam(ActionBase):
@@ -46,11 +46,8 @@ class CloseSteam(ActionBase):
             success = self.steam_library.close_steam()
         else:
             # Force kill via pkill
-            import subprocess
             try:
-                subprocess.run(["pkill", "-9", "steam"],
-                               stdout=subprocess.DEVNULL,
-                               stderr=subprocess.DEVNULL)
+                _run_check(["pkill", "-9", "steam"])
                 success = True
             except Exception as e:
                 print(f"[CloseSteam] Error force-killing Steam: {e}")
