@@ -1,12 +1,53 @@
 """
 Utilities for detecting and managing installed Steam games
 """
+import multiprocessing
+import os
 import re
 import subprocess
 import urllib.request
 import tempfile
 from pathlib import Path
 from typing import List, Dict, Optional
+
+
+def _is_in_flatpak() -> bool:
+    """Returns True if running inside a Flatpak sandbox."""
+    return os.path.isfile('/.flatpak-info')
+
+
+def _build_cmd(args: list) -> list:
+    """
+    Returns the command list wrapped with flatpak-spawn --host when inside Flatpak.
+    """
+    if _is_in_flatpak():
+        cmd = ["flatpak-spawn", "--host"] + args
+    else:
+        cmd = args
+    return cmd
+
+
+def _run_fire(args: list) -> None:
+    """Launch a command detached (fire-and-forget), Flatpak-aware."""
+    cmd = _build_cmd(args)
+    p = multiprocessing.Process(
+        target=subprocess.Popen,
+        args=[cmd],
+        kwargs={
+            "start_new_session": True,
+            "stdin": subprocess.DEVNULL,
+            "stdout": subprocess.DEVNULL,
+            "stderr": subprocess.DEVNULL,
+            "cwd": os.path.expanduser("~"),
+        }
+    )
+    p.start()
+
+
+def _run_check(args: list, timeout: int = 5) -> subprocess.CompletedProcess:
+    """Run a command and capture its output, Flatpak-aware."""
+    cmd = _build_cmd(args)
+    return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
 
 
 class SteamGame:
@@ -196,9 +237,7 @@ class SteamLibrary:
             else:
                 url = f"steam://rungameid/{app_id}"
 
-            subprocess.Popen(['xdg-open', url],
-                           stdout=subprocess.DEVNULL,
-                           stderr=subprocess.DEVNULL)
+            _run_fire(['xdg-open', url])
             return True
         except Exception as e:
             print(f"Error launching game {app_id}: {e}")
@@ -207,9 +246,7 @@ class SteamLibrary:
     def is_steam_running(self) -> bool:
         """Checks if Steam is running"""
         try:
-            result = subprocess.run(['pgrep', '-x', 'steam'],
-                                  capture_output=True,
-                                  text=True)
+            result = _run_check(['pgrep', '-x', 'steam'])
             return result.returncode == 0
         except Exception:
             return False
@@ -219,10 +256,7 @@ class SteamLibrary:
 
         # Method 1: wmctrl — list all windows and look for a Steam Big Picture window
         try:
-            result = subprocess.run(
-                ['wmctrl', '-l'],
-                capture_output=True, text=True, timeout=2
-            )
+            result = _run_check(['wmctrl', '-l'], timeout=2)
             if result.returncode == 0:
                 return 'big picture' in result.stdout.lower()
         except FileNotFoundError:
@@ -232,9 +266,9 @@ class SteamLibrary:
 
         # Method 2: xdotool — query window names by Steam's X11 class
         try:
-            result = subprocess.run(
+            result = _run_check(
                 ['xdotool', 'search', '--class', 'steam', 'getwindowname', '%@'],
-                capture_output=True, text=True, timeout=2
+                timeout=2
             )
             if result.returncode == 0:
                 return 'big picture' in result.stdout.lower()
@@ -248,10 +282,7 @@ class SteamLibrary:
     def open_big_picture(self) -> bool:
         """Opens Steam Big Picture mode"""
         try:
-            url = "steam://open/bigpicture"
-            subprocess.Popen(['xdg-open', url],
-                           stdout=subprocess.DEVNULL,
-                           stderr=subprocess.DEVNULL)
+            _run_fire(['xdg-open', 'steam://open/bigpicture'])
             return True
         except Exception as e:
             print(f"Error opening Big Picture: {e}")
@@ -259,11 +290,8 @@ class SteamLibrary:
 
     def minimize_steam(self) -> bool:
         """Minimizes Steam (hides from desktop)"""
-        url = "steam://close/bigpicture"
         try:
-            subprocess.run(['steam', url],
-                         stdout=subprocess.DEVNULL,
-                         stderr=subprocess.DEVNULL)
+            _run_check(['steam', 'steam://close/bigpicture'])
             return True
         except Exception as e:
             print(f"Error minimizing Steam: {e}")
@@ -272,9 +300,7 @@ class SteamLibrary:
     def close_steam(self) -> bool:
         """Closes Steam completely"""
         try:
-            subprocess.Popen(['steam', '-shutdown'],
-                           stdout=subprocess.DEVNULL,
-                           stderr=subprocess.DEVNULL)
+            _run_fire(['steam', '-shutdown'])
             return True
         except Exception as e:
             print(f"Error closing Steam: {e}")
@@ -356,9 +382,7 @@ class SteamLibrary:
             print(f"[change_status] Unknown status: {status}")
             return False
         try:
-            subprocess.Popen(['xdg-open', url],
-                             stdout=subprocess.DEVNULL,
-                             stderr=subprocess.DEVNULL)
+            _run_fire(['xdg-open', url])
             return True
         except Exception as e:
             print(f"Error changing status to {status}: {e}")
@@ -378,9 +402,7 @@ class SteamLibrary:
             print(f"[open_steam_page] Unknown page: {page}")
             return False
         try:
-            subprocess.Popen(['xdg-open', url],
-                             stdout=subprocess.DEVNULL,
-                             stderr=subprocess.DEVNULL)
+            _run_fire(['xdg-open', url])
             return True
         except Exception as e:
             print(f"Error opening Steam page {page}: {e}")
@@ -389,9 +411,7 @@ class SteamLibrary:
     def take_screenshot(self) -> bool:
         """Triggers a Steam screenshot"""
         try:
-            subprocess.Popen(['xdg-open', 'steam://screenshot'],
-                             stdout=subprocess.DEVNULL,
-                             stderr=subprocess.DEVNULL)
+            _run_fire(['xdg-open', 'steam://screenshot'])
             return True
         except Exception as e:
             print(f"Error taking screenshot: {e}")
