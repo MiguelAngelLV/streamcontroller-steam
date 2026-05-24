@@ -19,12 +19,14 @@ def _is_in_flatpak() -> bool:
 def _build_cmd(args: list) -> list:
     """
     Returns the command list wrapped with flatpak-spawn --host when inside Flatpak.
+    --directory forces the working directory on the host side, avoiding the
+    'Failed to start command: No such file or directory' error that occurs when
+    the Flatpak sandbox cwd (/app/bin/StreamController) doesn't exist on the host.
     """
     if _is_in_flatpak():
-        cmd = ["flatpak-spawn", "--host"] + args
-    else:
-        cmd = args
-    return cmd
+        home = os.path.expanduser("~")
+        return ["flatpak-spawn", "--host", f"--directory={home}"] + args
+    return args
 
 
 def _run_fire(args: list) -> None:
@@ -46,8 +48,7 @@ def _run_fire(args: list) -> None:
 
 def _run_check(args: list, timeout: int = 5) -> subprocess.CompletedProcess:
     """Run a command and capture its output, Flatpak-aware."""
-    cmd = _build_cmd(args)
-    return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    return subprocess.run(_build_cmd(args), capture_output=True, text=True, timeout=timeout)
 
 
 class SteamGame:
@@ -236,7 +237,6 @@ class SteamLibrary:
                 url = f"steam://open/bigpicture/steam://rungameid/{app_id}"
             else:
                 url = f"steam://rungameid/{app_id}"
-
             _run_fire(['xdg-open', url])
             return True
         except Exception as e:
@@ -246,25 +246,38 @@ class SteamLibrary:
     def is_steam_running(self) -> bool:
         """Checks if Steam is running"""
         try:
-            result = _run_check(['pgrep', '-x', 'steam'])
-            return result.returncode == 0
+            return _run_check(['pgrep', '-x', 'steam']).returncode == 0
         except Exception:
             return False
 
     def is_big_picture_active(self) -> bool:
-        """Checks if Big Picture mode is currently active by inspecting live window state."""
+        """Checks if Big Picture mode is currently active."""
 
-        # Method 1: wmctrl — list all windows and look for a Steam Big Picture window
+        # Method 1: registry.vdf
+        try:
+            if self.steam_path:
+                registry_path = self.steam_path / "registry.vdf"
+                if registry_path.exists():
+                    with open(registry_path, 'r', encoding='utf-8', errors='ignore') as f:
+                        content = f.read()
+                    if re.search(r'"BigPictureInForeground"\s+"1"', content):
+                        return True
+                    if re.search(r'"SteamBigPicture"\s+"1"', content):
+                        return True
+                    if re.search(r'"BigPictureInForeground"\s+"0"', content):
+                        return False
+        except Exception as e:
+            print(f"[is_big_picture_active] registry.vdf check failed: {e}")
+
+        # Method 2: wmctrl
         try:
             result = _run_check(['wmctrl', '-l'], timeout=2)
             if result.returncode == 0:
                 return 'big picture' in result.stdout.lower()
-        except FileNotFoundError:
-            pass  # wmctrl not installed, try next method
-        except Exception as e:
-            print(f"[is_big_picture_active] wmctrl failed: {e}")
+        except (FileNotFoundError, Exception):
+            pass
 
-        # Method 2: xdotool — query window names by Steam's X11 class
+        # Method 3: xdotool
         try:
             result = _run_check(
                 ['xdotool', 'search', '--class', 'steam', 'getwindowname', '%@'],
@@ -272,10 +285,8 @@ class SteamLibrary:
             )
             if result.returncode == 0:
                 return 'big picture' in result.stdout.lower()
-        except FileNotFoundError:
-            pass  # xdotool not installed
-        except Exception as e:
-            print(f"[is_big_picture_active] xdotool failed: {e}")
+        except (FileNotFoundError, Exception):
+            pass
 
         return False
 
@@ -289,9 +300,9 @@ class SteamLibrary:
             return False
 
     def minimize_steam(self) -> bool:
-        """Minimizes Steam (hides from desktop)"""
+        """Exits Big Picture mode (returns to normal desktop Steam)"""
         try:
-            _run_check(['steam', 'steam://close/bigpicture'])
+            _run_fire(['xdg-open', 'steam://close/bigpicture'])
             return True
         except Exception as e:
             print(f"Error minimizing Steam: {e}")
@@ -379,7 +390,6 @@ class SteamLibrary:
         }
         url = status_map.get(status)
         if not url:
-            print(f"[change_status] Unknown status: {status}")
             return False
         try:
             _run_fire(['xdg-open', url])
@@ -399,7 +409,6 @@ class SteamLibrary:
         }
         url = page_map.get(page)
         if not url:
-            print(f"[open_steam_page] Unknown page: {page}")
             return False
         try:
             _run_fire(['xdg-open', url])

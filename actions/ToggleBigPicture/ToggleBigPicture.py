@@ -4,14 +4,13 @@ from src.backend.PageManagement.Page import Page
 from src.backend.PluginManager.PluginBase import PluginBase
 
 import os
-import subprocess
 
 import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Adw, GLib
 
-from ...steam_utils import get_steam_library
+from ...steam_utils import get_steam_library, _run_fire
 
 
 class ToggleBigPicture(ActionBase):
@@ -60,9 +59,7 @@ class ToggleBigPicture(ActionBase):
             if settings.get("start_in_bp", True):
                 self.steam_library.open_big_picture()
             else:
-                subprocess.Popen(['steam'],
-                                 stdout=subprocess.DEVNULL,
-                                 stderr=subprocess.DEVNULL)
+                _run_fire(['steam'])
             GLib.timeout_add(3000, self._delayed_update)
         elif self.steam_library.is_big_picture_active():
             # Currently in Big Picture → switch to normal desktop mode
