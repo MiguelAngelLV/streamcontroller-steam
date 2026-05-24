@@ -62,9 +62,9 @@ class SteamPlugin(PluginBase):
         self.add_action_holder(self.take_screenshot_holder)
 
         self.register(
-            plugin_name = "Steam Games",
-            github_repo = "https://github.com/StreamController/SteamPlugin",
-            plugin_version = "1.0.2",
+            plugin_name = "Steam",
+            github_repo = "https://github.com/miguelangellv/streamcontroller-steam",
+            plugin_version = "1.0.0",
             app_version = "1.1.1-alpha"
         )
 
