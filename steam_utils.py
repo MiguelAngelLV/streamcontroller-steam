@@ -234,10 +234,9 @@ class SteamLibrary:
         """Launches a Steam game"""
         try:
             if big_picture:
-                url = f"steam://open/bigpicture/steam://rungameid/{app_id}"
+                _run_fire(["steam","-bigpicture", f"steam://rungameid/{app_id}"])
             else:
-                url = f"steam://rungameid/{app_id}"
-            _run_fire(['xdg-open', url])
+                _run_fire(["steam", f"steam://rungameid/{app_id}"])
             return True
         except Exception as e:
             print(f"Error launching game {app_id}: {e}")
