@@ -1,6 +1,7 @@
 from src.backend.PluginManager.PluginBase import PluginBase
 from src.backend.PluginManager.ActionHolder import ActionHolder
 
+
 from .actions.LaunchGame.LaunchGame import LaunchGame
 from .actions.ToggleBigPicture.ToggleBigPicture import ToggleBigPicture
 from .actions.CloseSteam.CloseSteam import CloseSteam
